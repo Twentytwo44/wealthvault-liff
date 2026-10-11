@@ -1,0 +1,15 @@
+{
+  "name": "wealthvault-line-liff",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=20.9"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @wealthvault/liff-web dev",
+    "build": "pnpm --filter @wealthvault/liff-web build",
+    "start": "pnpm --filter @wealthvault/liff-web start",
+    "lint": "pnpm --filter @wealthvault/liff-web lint",
+    "typecheck": "pnpm --filter @wealthvault/liff-web typecheck"
+  }
+}
