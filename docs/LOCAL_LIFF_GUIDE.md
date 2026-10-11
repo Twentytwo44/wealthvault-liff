@@ -140,3 +140,13 @@ cd /Users/natchapon/Documents/wealthvault-line-liff && pnpm lint && pnpm typeche
 ## ขอบเขตที่ยังไม่ใช่ production-ready
 
 ยังไม่มีการส่งแชทสดและยังไม่ได้วัด performance. ก่อน production ต้องแยก audit เรื่อง credentials ที่ฝังใน Compose, CORS, gateway request limit, สิทธิ์ WebSocket, migration ของข้อมูลเดิม และการทดสอบบนโทรศัพท์จริง. ห้ามนำ local Compose/HTTP override นี้ไป deploy ตรง ๆ.
+
+## การแจ้งเตือนผ่าน LINE OA
+
+หน้า **การแจ้งเตือน** มีสวิตช์ให้ผู้ใช้เปิดรับ LINE แยกจากการแจ้งเตือนในแอป ค่าเริ่มต้นคือปิด หลังเปิดแล้วระบบส่งเฉพาะคำขอเป็นเพื่อน การตอบรับเพื่อน คำเชิญกลุ่ม การแชร์ทรัพย์สิน และการเตือนประกัน พร้อมลิงก์กลับ LIFF โดยไม่ใส่ชื่อทรัพย์สินหรือยอดเงินในข้อความ LINE
+
+- `services/notification-service/.noti.env` ต้องมี `CHANNEL_ACCESS_TOKEN` ของ LINE OA, `LINE_NOTIFICATIONS_ENABLED=true` และ `LINE_LIFF_URL=https://liff.line.me/<LIFF_ID>`; ห้ามใส่ token ในไฟล์ที่ commit หรือใน browser
+- LINE Login channel ที่ใช้ LIFF กับ Messaging API channel ของ OA ต้องอยู่ภายใต้ **provider เดียวกัน** มิฉะนั้น LINE user ID อาจไม่ตรงกันและ push ไม่ถึงผู้รับ
+- ผู้รับต้องเป็นเพื่อนกับ OA และต้องเปิดสวิตช์ใน WealthVault เอง การล็อกอิน LIFF อย่างเดียวไม่ถือเป็นการยินยอมรับ push
+- ทดสอบด้วยบัญชี LINE ทดสอบสองบัญชี: บัญชี A ส่งคำขอเพื่อนหรือแชร์ทรัพย์สินให้ B; B เปิดสวิตช์และเป็นเพื่อนกับ OA จากนั้นควรเห็นทั้งรายการในแอปและข้อความในแชท OA. ถ้าไม่ถึง ให้ตรวจสถานะ response ของ notification service โดยไม่พิมพ์ token หรือ LINE user ID ใน log
+- การส่ง LINE มี retry key และ retry ชั่วคราว แต่ NATS consumer ปัจจุบันยังไม่ใช่ durable outbox จึงยังไม่รับประกันการส่งทุกเหตุการณ์เมื่อ service หยุดกลางคัน

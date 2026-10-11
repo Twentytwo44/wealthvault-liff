@@ -22,6 +22,7 @@ const notifications: PreviewRecord[] = [
   { ID: "notice-1", Message: "ยินดีต้อนรับสู่ WealthVault โหมดตัวอย่าง", EntityType: "welcome", CreatedAt: "วันนี้", IsRead: false },
   { ID: "notice-2", Message: "คุณสามารถทดลองจัดการรายการตัวอย่างได้", EntityType: "portfolio", CreatedAt: "วันนี้", IsRead: true }
 ];
+let previewLineNotificationsEnabled = false;
 
 const profile: PreviewRecord = {
   id: "preview-user", username: "demo_user", first_name: "ผู้ใช้", last_name: "ตัวอย่าง",
@@ -112,6 +113,10 @@ export async function requestLocalPreview(path: string, method: string, body?: P
   }
 
   if (route === "notifications" || route === "notifications/") return envelope(notifications);
+  if (route === "notifications/line-settings") {
+    if (verb === "PUT") previewLineNotificationsEnabled = values.enabled === true;
+    return envelope({ enabled: previewLineNotificationsEnabled, available: false });
+  }
   if (segments[0] === "notifications" && segments[1] === "read-all" && verb === "PUT") {
     notifications.forEach((item) => { item.IsRead = true; });
     return { success: true };

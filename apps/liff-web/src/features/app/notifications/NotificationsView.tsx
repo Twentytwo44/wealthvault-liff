@@ -4,6 +4,7 @@ import { useState } from "react";
 import { apiRequest, arrayOf, errorMessage, textOf, valueOf } from "@/lib/api-client";
 import { useCachedApi } from "@/lib/use-cached-api";
 import { EmptyPanel, ErrorPanel, LoadingPanel, PageHeading } from "../components/FeedbackPanels";
+import { LineNotificationSetting } from "./LineNotificationSetting";
 
 export function NotificationsView({ query }: { query: ReturnType<typeof useCachedApi> }) {
   const { data, loading, refreshing, error: loadError, refresh } = query;
@@ -36,6 +37,7 @@ export function NotificationsView({ query }: { query: ReturnType<typeof useCache
   const unread = items.filter((item) => valueOf(item, "IsRead", "is_read") !== true).length;
   return <>
     <PageHeading eyebrow="อัปเดตจากบัญชีของคุณ" title="การแจ้งเตือน" description="ติดตามคำขอจากเพื่อนและความเคลื่อนไหวที่เกี่ยวข้องกับบัญชีของคุณ" action={unread > 0 ? <button className="button button-quiet" onClick={() => void markAllRead()} disabled={busy} type="button">ทำเครื่องหมายว่าอ่านแล้วทั้งหมด</button> : undefined} />
+    <LineNotificationSetting />
     <section className="panel notifications-panel">
       <div className="panel-heading"><div><span className="eyebrow">กล่องข้อความ</span><h2>{unread ? `${unread} รายการที่ยังไม่ได้อ่าน` : "อ่านครบแล้ว"}</h2></div><button className="icon-button" aria-label="รีเฟรช" onClick={() => void refresh()} type="button">↻</button></div>
       {refreshing && <div className="inline-notice" role="status">กำลังอัปเดตการแจ้งเตือน…</div>}

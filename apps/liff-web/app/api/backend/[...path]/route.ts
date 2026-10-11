@@ -49,6 +49,7 @@ const rules: RouteRule[] = [
   { path: /^share\/item\/[A-Za-z0-9_-]{1,100}\/?$/, methods: new Set(["GET"]) },
   { path: /^share\/item\/(account|cash|invest|investment|insurance|land|building|liability)\/[A-Za-z0-9_-]{1,100}\/shared-targets\/?$/, methods: new Set(["GET"]) },
   { path: /^notifications\/?$/, methods: new Set(["GET"]) },
+  { path: /^notifications\/line-settings\/?$/, methods: new Set(["GET", "PUT"]) },
   { path: /^notifications\/read-all\/?$/, methods: new Set(["PUT"]) },
   { path: /^notifications\/[A-Za-z0-9_-]{1,100}\/read\/?$/, methods: new Set(["PUT"]) }
 ];
