@@ -154,18 +154,23 @@ export async function refreshSessionTokens(sessionId: string, force = false, sta
   if (!force && initial.accessTokenExpiresAt > Date.now() + 30_000) return initial;
 
   let acquired = false;
-  for (let attempt = 0; attempt < 30; attempt += 1) {
+  // The refresh request can take up to 5 seconds. Other requests must wait longer
+  // than that before deciding the shared session cannot be refreshed.
+  for (let attempt = 0; attempt < 70; attempt += 1) {
     const current = await getSession(sessionId);
     if (!current) return null;
     if (current.accessToken !== initial.accessToken && current.accessTokenExpiresAt > Date.now() + 5_000) return current;
-    const result = await client.set(lockKey, lockValue, { NX: true, PX: 8_000 });
+    const result = await client.set(lockKey, lockValue, { NX: true, PX: 10_000 });
     if (result === "OK") {
       acquired = true;
       break;
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  if (!acquired) return null;
+  if (!acquired) {
+    const current = await getSession(sessionId);
+    return current?.accessToken !== initial.accessToken ? current : null;
+  }
 
   try {
     const current = await getSession(sessionId);

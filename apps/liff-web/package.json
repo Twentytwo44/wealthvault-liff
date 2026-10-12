@@ -6,6 +6,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test:chat-timeline": "node --experimental-strip-types --test tests/chat-timeline.test.mjs",
     "test:line-oa": "node --experimental-strip-types --test tests/line-oa.test.mjs",
     "typecheck": "tsc --noEmit"
   },

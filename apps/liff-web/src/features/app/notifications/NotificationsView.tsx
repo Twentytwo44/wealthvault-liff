@@ -35,7 +35,7 @@ export function NotificationsView({ query }: { query: ReturnType<typeof useCache
   }
 
   const unread = items.filter((item) => valueOf(item, "IsRead", "is_read") !== true).length;
-  return <>
+  return <div className="notifications-page">
     <PageHeading eyebrow="อัปเดตจากบัญชีของคุณ" title="การแจ้งเตือน" description="ติดตามคำขอจากเพื่อนและความเคลื่อนไหวที่เกี่ยวข้องกับบัญชีของคุณ" action={unread > 0 ? <button className="button button-quiet" onClick={() => void markAllRead()} disabled={busy} type="button">ทำเครื่องหมายว่าอ่านแล้วทั้งหมด</button> : undefined} />
     <LineNotificationSetting />
     <section className="panel notifications-panel">
@@ -58,5 +58,5 @@ export function NotificationsView({ query }: { query: ReturnType<typeof useCache
         })}
       </div> : !error ? <EmptyPanel title="ยังไม่มีการแจ้งเตือน" description="เมื่อมีความเคลื่อนไหว คุณจะเห็นรายละเอียดได้ที่นี่" /> : null}
     </section>
-  </>;
+  </div>;
 }

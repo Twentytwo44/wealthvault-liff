@@ -77,6 +77,9 @@ export async function apiRequest<T = unknown>(path: string, options: {
   const result: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const code = record(result)?.code;
+    if (response.status === 401 && (code === "unauthenticated" || code === "session_expired")) {
+      window.dispatchEvent(new Event("wealthvault:session-expired"));
+    }
     const message = typeof code === "string" ? errorText(code, response.status) : "ทำรายการไม่สำเร็จ กรุณาลองอีกครั้ง";
     throw new ApiError(message, response.status);
   }

@@ -8,6 +8,7 @@ import { AssetIdentityIcon, assetLabelForItem, sharedAssetFromResponse, sharedAs
 import { SharedAssetDetailDialog } from "../assets/SharedAssetDetailDialog";
 import { EmptyPanel, ErrorPanel, LoadingPanel, PageHeading } from "../components/FeedbackPanels";
 import { loadTargetShareSelection, shareableAssetKey } from "./shareSelection";
+import { buildChatTimeline } from "./chatTimeline";
 
 export function GroupProfilePanel({ group, onBack, onOpenGroup }: { group: Record<string, unknown>; onBack: () => void; onOpenGroup: () => void }) {
   const id = textOf(group, "id", "ID");
@@ -197,6 +198,7 @@ export function GroupDetailPanel({ group, currentUserId, onBack, onOpenProfile }
     finally { setBusy(false); }
   }
 
+  const timeline = buildChatTimeline(messages, sharedAssets);
   return <section className="panel group-detail-panel">
     <div className="group-detail-head"><button className="back-button" onClick={onBack} type="button">← <span>กลับไปกลุ่ม</span></button><button className="group-detail-title profile-trigger" onClick={onOpenProfile} type="button" aria-label={`ดูโปรไฟล์กลุ่ม ${textOf(group, "group_name", "name") || "กลุ่ม WealthVault"}`}><span className="group-avatar group-avatar-large">{(textOf(group, "group_name", "name") || "G").slice(0, 1).toUpperCase()}</span><span className="profile-trigger-copy"><span className="eyebrow">พื้นที่ร่วมกัน</span><strong>{textOf(group, "group_name", "name") || "กลุ่ม WealthVault"}</strong><small>{members.length} สมาชิก · ดูโปรไฟล์</small></span><span className="profile-trigger-chevron">›</span></button><button className="button button-quiet" onClick={() => void leave()} disabled={busy} type="button">ออกจากกลุ่ม</button></div>
     <div className="social-tabs small-tabs"><button className={tab === "members" ? "selected" : ""} onClick={() => setTab("members")} type="button">สมาชิก</button><button className={tab === "chat" ? "selected" : ""} onClick={() => { setTab("chat"); void loadSharedAssets(); }} type="button">แชต</button></div>
@@ -208,7 +210,16 @@ export function GroupDetailPanel({ group, currentUserId, onBack, onOpenProfile }
       <section className="chat-panel" aria-label="บทสนทนาในกลุ่ม">
         <div className="chat-transcript" aria-live="polite">
           <div className="chat-day-divider"><span>บทสนทนาในกลุ่ม</span></div>
-          {messages.map((message, index) => {
+          {timeline.map((entry) => {
+            if (entry.kind === "asset") {
+              const asset = entry.asset;
+              const ownShare = textOf(asset, "shared_by") === currentUserId;
+              const amount = sharedAssetValue(asset);
+              return <article className={`chat-message ${ownShare ? "is-own" : ""}`} key={entry.key}>
+                <button className="chat-asset-bubble" onClick={() => setSelectedSharedAsset(asset)} type="button"><span className="chat-asset-overline">◈ {ownShare ? "แชร์ทรัพย์สินให้กลุ่ม" : "สมาชิกแชร์ทรัพย์สิน"}</span><strong>{textOf(asset, "name", "title") || "ทรัพย์สิน"}</strong><small>{assetLabelForItem(asset)} · {amount === null ? "ไม่ระบุมูลค่า" : formatMoney(amount)}</small><span className="chat-asset-hint">ดูรายละเอียด ›</span></button>
+              </article>;
+            }
+            const message = entry.message;
             const senderId = textOf(message, "sender_id", "user_id");
             const ownMessage = senderId !== "" && senderId === currentUserId;
             const senderName = textOf(message, "sender_name", "username") || (ownMessage ? "คุณ" : "สมาชิก");
@@ -219,7 +230,7 @@ export function GroupDetailPanel({ group, currentUserId, onBack, onOpenProfile }
             const assetMessage = Boolean(assetId || itemName);
             const sharedAsset = assetId ? sharedAssets.find((asset) => textOf(asset, "id", "ID") === assetId && (!assetType || sharedAssetKind(asset) === (assetType.toLowerCase() === "investment" ? "invest" : assetType.toLowerCase()))) : undefined;
             const content = textOf(message, "content", "message");
-            return <article className={`chat-message ${ownMessage ? "is-own" : ""}`} key={textOf(message, "id", "ID") || index}>
+            return <article className={`chat-message ${ownMessage ? "is-own" : ""}`} key={entry.key}>
               {!ownMessage && <span className="message-avatar">{senderName.slice(0, 1).toUpperCase()}</span>}
               {assetMessage ? sharedAsset ? <button className="chat-asset-bubble" onClick={() => setSelectedSharedAsset(sharedAsset)} type="button"><span className="chat-asset-overline">◈ {ownMessage ? "แชร์ทรัพย์สินให้กลุ่ม" : `${senderName} แชร์ทรัพย์สิน`}</span><strong>{itemName || content || "รายการทรัพย์สิน"}</strong><small>{assetLabelForItem(metadata ?? {}, assetType || "ทรัพย์สิน")} · {textOf(message, "created_at")}</small><span className="chat-asset-hint">ดูรายละเอียด ›</span></button> : <div className="chat-asset-bubble"><span className="chat-asset-overline">◈ {ownMessage ? "แชร์ทรัพย์สินให้กลุ่ม" : `${senderName} แชร์ทรัพย์สิน`}</span><strong>{itemName || content || "รายการทรัพย์สิน"}</strong><small>{assetLabelForItem(metadata ?? {}, assetType || "ทรัพย์สิน")} · {textOf(message, "created_at")}</small><span className="chat-asset-unavailable">{sharedAssetsLoading ? "กำลังตรวจสิทธิ์การแชร์…" : "ไม่สามารถดูรายละเอียดรายการนี้"}</span></div> : <div className="chat-message-body">
                 {!ownMessage && <strong className="chat-sender">{senderName}</strong>}
@@ -227,13 +238,7 @@ export function GroupDetailPanel({ group, currentUserId, onBack, onOpenProfile }
               </div>}
             </article>;
           })}
-          {sharedAssets.length > 0 && <>
-            <div className="chat-day-divider"><span>ทรัพย์สินที่แชร์กับกลุ่ม</span></div>
-            {sharedAssets.map((asset, index) => { const ownShare = textOf(asset, "shared_by") === currentUserId; const amount = sharedAssetValue(asset); return <article className={`chat-message ${ownShare ? "is-own" : ""}`} key={shareableAssetKey(asset) || index}>
-              <button className="chat-asset-bubble" onClick={() => setSelectedSharedAsset(asset)} type="button"><span className="chat-asset-overline">◈ {ownShare ? "แชร์ทรัพย์สินให้กลุ่ม" : "สมาชิกแชร์ทรัพย์สิน"}</span><strong>{textOf(asset, "name", "title") || "ทรัพย์สิน"}</strong><small>{assetLabelForItem(asset)} · {amount === null ? "ไม่ระบุมูลค่า" : formatMoney(amount)}</small><span className="chat-asset-hint">ดูรายละเอียด ›</span></button>
-            </article>; })}
-          </>}
-          {!messages.length && !sharedAssets.length && <EmptyPanel title="เริ่มบทสนทนา" description="แชร์รายการทรัพย์สินให้สมาชิกกลุ่มดูได้จากปุ่มด้านล่าง" />}
+          {!timeline.length && <EmptyPanel title="เริ่มบทสนทนา" description="แชร์รายการทรัพย์สินให้สมาชิกกลุ่มดูได้จากปุ่มด้านล่าง" />}
         </div>
         {shareNotice && <div className="inline-notice" role="status">✓ {shareNotice}</div>}
         <div className="chat-composer">

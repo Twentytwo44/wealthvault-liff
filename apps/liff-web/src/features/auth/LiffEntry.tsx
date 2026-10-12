@@ -1,10 +1,11 @@
 "use client";
 
 import liff from "@line/liff";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { PublicLiffSession, SessionUser } from "@wealthvault/contracts/auth";
 import { AuthenticatedApp } from "@/features/app/AuthenticatedApp";
 import { disableLocalPreview, enableLocalPreview } from "@/lib/api-client";
+import { clearCachedQueries } from "@/lib/query-cache";
 
 type EntryState =
   | { kind: "loading"; message: string }
@@ -18,9 +19,27 @@ class LoginRequestError extends Error {}
 export function LiffEntry() {
   const [state, setState] = useState<EntryState>({ kind: "loading", message: "กำลังตรวจสอบการเข้าสู่ระบบ…" });
   const [localPreview, setLocalPreview] = useState(false);
+  const [sessionRecoveryAttempt, setSessionRecoveryAttempt] = useState(0);
+  const recoveryQueued = useRef(false);
+  const lastRecoveryCompletedAt = useRef(0);
+  const liffInitialization = useRef<Promise<void> | null>(null);
   const localTestLogin = process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_LOCAL_TEST_LOGIN === "true";
 
+  useEffect(() => {
+    const recoverSession = () => {
+      if (state.kind !== "result" || state.result.status !== "authenticated" || recoveryQueued.current) return;
+      if (Date.now() - lastRecoveryCompletedAt.current < 5_000) return;
+      recoveryQueued.current = true;
+      clearCachedQueries();
+      setState({ kind: "loading", message: "กำลังเชื่อมต่อบัญชีใหม่…" });
+      setSessionRecoveryAttempt((attempt) => attempt + 1);
+    };
+    window.addEventListener("wealthvault:session-expired", recoverSession);
+    return () => window.removeEventListener("wealthvault:session-expired", recoverSession);
+  }, [state]);
+
   async function signOut() {
+    recoveryQueued.current = true;
     setState({ kind: "loading", message: "กำลังออกจากระบบ…" });
     if (localPreview) {
       disableLocalPreview();
@@ -51,11 +70,18 @@ export function LiffEntry() {
       }
 
       if (localTestLogin) {
+        if (sessionRecoveryAttempt > 0) {
+          lastRecoveryCompletedAt.current = Date.now();
+          recoveryQueued.current = false;
+          setState({ kind: "local_login" });
+          return;
+        }
         try {
           const existingSession = await fetch("/api/auth/session", { cache: "no-store" });
           if (!existingSession.ok) throw new Error("session lookup failed");
           const session = (await existingSession.json()) as { status?: string; user?: SessionUser };
           if (!active) return;
+          recoveryQueued.current = false;
           setState(session.status === "authenticated" && session.user
             ? { kind: "result", result: { status: "authenticated", user: session.user } }
             : { kind: "local_login" });
@@ -72,7 +98,13 @@ export function LiffEntry() {
       }
 
       try {
-        await liff.init({ liffId, withLoginOnExternalBrowser: true });
+        liffInitialization.current ??= liff.init({ liffId, withLoginOnExternalBrowser: true });
+        try {
+          await liffInitialization.current;
+        } catch (cause) {
+          liffInitialization.current = null;
+          throw cause;
+        }
         if (!active) return;
 
         if (!liff.isLoggedIn()) {
@@ -80,12 +112,16 @@ export function LiffEntry() {
           return;
         }
 
-        const existingSession = await fetch("/api/auth/session", { cache: "no-store" });
-        if (!existingSession.ok) throw new Error("session lookup failed");
-        const session = (await existingSession.json()) as { status?: string; user?: SessionUser };
-        if (session.status === "authenticated" && session.user) {
-          setState({ kind: "result", result: { status: "authenticated", user: session.user } });
-          return;
+        if (sessionRecoveryAttempt === 0) {
+          const existingSession = await fetch("/api/auth/session", { cache: "no-store" });
+          if (!existingSession.ok) throw new Error("session lookup failed");
+          const session = (await existingSession.json()) as { status?: string; user?: SessionUser };
+          if (!active) return;
+          if (session.status === "authenticated" && session.user) {
+            recoveryQueued.current = false;
+            setState({ kind: "result", result: { status: "authenticated", user: session.user } });
+            return;
+          }
         }
 
         const idToken = liff.getIDToken();
@@ -115,7 +151,11 @@ export function LiffEntry() {
           throw new LoginRequestError(message);
         }
         const result = (await response.json()) as PublicLiffSession;
-        if (active) setState({ kind: "result", result });
+        if (active) {
+          if (sessionRecoveryAttempt > 0) lastRecoveryCompletedAt.current = Date.now();
+          recoveryQueued.current = false;
+          setState({ kind: "result", result });
+        }
       } catch (error) {
         if (active) setState({ kind: "error", message: error instanceof LoginRequestError
           ? error.message
@@ -125,7 +165,7 @@ export function LiffEntry() {
 
     void start();
     return () => { active = false; };
-  }, [localTestLogin]);
+  }, [localTestLogin, sessionRecoveryAttempt]);
 
   const result = state.kind === "result" ? state.result : null;
   if (result?.status === "authenticated") {

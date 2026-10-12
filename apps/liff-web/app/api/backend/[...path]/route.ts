@@ -239,6 +239,8 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     return error("backend_unavailable", 502);
   }
 
+  if (upstream.status === 401) return error("session_expired", 401);
+
   if (upstream.status === 204 || upstream.status === 304) {
     const response = new NextResponse(null, { status: upstream.status });
     response.headers.set("Cache-Control", "no-store");

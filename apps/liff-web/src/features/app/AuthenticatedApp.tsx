@@ -56,7 +56,6 @@ function AuthenticatedAppContent({ user, onLogout, localPreview }: { user: Sessi
             </button>
           ))}
         </nav>
-        <div className="side-note"><span className="secure-dot" />ข้อมูลส่วนตัวของคุณเข้าถึงได้เฉพาะคุณ</div>
         <button className="side-user" onClick={() => setSection("profile")} type="button">
           <span className="avatar">{(user.displayName || "W").slice(0, 1).toUpperCase()}</span>
           <span className="side-user-copy"><strong>{user.displayName || "สมาชิก WealthVault"}</strong><small>บัญชี LINE</small></span>
